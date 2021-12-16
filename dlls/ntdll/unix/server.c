@@ -185,13 +185,25 @@ static DECLSPEC_NORETURN void server_protocol_perror( const char *err )
 static unsigned int send_request( const struct __server_request_info *req )
 {
     unsigned int i;
-    int ret;
+    int ret = 0;
 
+    int to_write = sizeof(req->u.req) + req->u.req.request_header.request_size;
     if (!req->u.req.request_header.request_size)
     {
-        if ((ret = write( ntdll_get_thread_data()->request_fd, &req->u.req,
-                          sizeof(req->u.req) )) == sizeof(req->u.req)) return STATUS_SUCCESS;
-
+        const char *write_ptr = (const char *)&req->u.req;
+        for (;;) {
+            ret = write( ntdll_get_thread_data()->request_fd, (void*)write_ptr,
+                         to_write );
+            if (ret == to_write) return STATUS_SUCCESS;
+            else if (ret < 0) break;
+            /* Short write. Most signals are blocked at this point, but it is
+               still possible to experience a syscall restart due to, e.g.
+               a SIGSTOP, cgroup freeze or external debug/profile tooling.
+               This is not an error. Simply adjust the remaining write length
+               and buffer and start again. */
+            to_write -= ret;
+            write_ptr += ret;
+        }
     }
     else
     {
@@ -204,11 +216,26 @@ static unsigned int send_request( const struct __server_request_info *req )
             vec[i+1].iov_base = (void *)req->data[i].ptr;
             vec[i+1].iov_len = req->data[i].size;
         }
-        if ((ret = writev( ntdll_get_thread_data()->request_fd, vec, i+1 )) ==
-            req->u.req.request_header.request_size + sizeof(req->u.req)) return STATUS_SUCCESS;
+
+        for (;;) {
+            ret = writev( ntdll_get_thread_data()->request_fd, vec, i+1 );
+            if (ret == to_write) return STATUS_SUCCESS;
+            else if (ret < 0) break;
+            /* Short write as above. Adjust buffer lengths and start again. */
+            to_write -= ret;
+            for (unsigned int j = 0; j < i+1; j++) {
+                if (ret >= vec[j].iov_len) {
+                    ret -= vec[j].iov_len;
+                    vec[j].iov_len = 0;
+                } else {
+                    vec[j].iov_base = (char *)vec[j].iov_base + ret;
+                    vec[j].iov_len -= ret;
+                    break;
+                }
+            }
+        }
     }
 
-    if (ret >= 0) server_protocol_error( "partial write %d\n", ret );
     if (errno == EPIPE) abort_thread(0);
     if (errno == EFAULT) return STATUS_ACCESS_VIOLATION;
     server_protocol_perror( "write" );
