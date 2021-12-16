@@ -1092,6 +1092,13 @@ NTSTATUS WINAPI NtQueryInformationProcess( HANDLE handle, PROCESSINFOCLASS class
     UNIMPLEMENTED_INFO_CLASS(ProcessLUIDDeviceMapsEnabled);
     UNIMPLEMENTED_INFO_CLASS(ProcessBreakOnTermination);
     UNIMPLEMENTED_INFO_CLASS(ProcessHandleTracing);
+    UNIMPLEMENTED_INFO_CLASS(ProcessImageFileMapping);
+    UNIMPLEMENTED_INFO_CLASS(ProcessAffinityUpdateMode);
+    UNIMPLEMENTED_INFO_CLASS(ProcessMemoryAllocationMode);
+    UNIMPLEMENTED_INFO_CLASS(ProcessGroupInformation);
+    UNIMPLEMENTED_INFO_CLASS(ProcessTokenVirtualizationEnabled);
+    UNIMPLEMENTED_INFO_CLASS(ProcessConsoleHostProcess);
+    UNIMPLEMENTED_INFO_CLASS(ProcessWindowInformation);
 
     case ProcessBasicInformation:
         {

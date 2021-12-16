@@ -687,7 +687,7 @@ static void test_GetModuleFileNameEx(void)
             return;
     ok(ret == strlen(szModExPath), "szModExPath=\"%s\" ret=%d\n", szModExPath, ret);
     GetModuleFileNameA(NULL, szModPath, sizeof(szModPath));
-    ok(!strncmp(szModExPath, szModPath, MAX_PATH), 
+    ok(!strncmp(szModExPath, szModPath, MAX_PATH),
        "szModExPath=\"%s\" szModPath=\"%s\"\n", szModExPath, szModPath);
 
     SetLastError(0xdeadbeef);
@@ -791,7 +791,7 @@ static void test_ws_functions(void)
     SetLastError(0xdeadbeef);
     ret = InitializeProcessForWsWatch(ws_handle);
     ok(ret == 1, "failed with %d\n", GetLastError());
-    
+
     addr = VirtualAlloc(NULL, 1, MEM_COMMIT, PAGE_READWRITE);
     if(!addr)
         return;
@@ -817,7 +817,7 @@ static void test_ws_functions(void)
 
 	todo_wine ok(0, "GetWsChanges didn't find our page\n");
     }
-    
+
 free_page:
     VirtualFree(addr, 0, MEM_RELEASE);
 }
