@@ -764,19 +764,17 @@ struct module_iterator
 };
 
 
-static BOOL init_module_iterator( struct module_iterator *iter, HANDLE process )
+static BOOL init_module_iterator( struct module_iterator *iter, HANDLE process, BOOL wow64_libs)
 {
     PROCESS_BASIC_INFORMATION pbi;
     PPEB_LDR_DATA ldr_data;
-
-    if (!IsWow64Process( process, &iter->wow64 )) return FALSE;
 
     /* get address of PEB */
     if (!set_ntstatus( NtQueryInformationProcess( process, ProcessBasicInformation,
                                                   &pbi, sizeof(pbi), NULL )))
         return FALSE;
 
-    if (is_win64 && iter->wow64)
+    if (is_win64 && wow64_libs)
     {
         PEB_LDR_DATA32 *ldr_data32_ptr;
         DWORD ldr_data32, first_module;
@@ -835,13 +833,35 @@ static int module_iterator_next( struct module_iterator *iter )
     return 1;
 }
 
+static int module_iterator_collect( struct module_iterator *iter, DWORD *size, DWORD *count, HMODULE *module, DWORD *needed, DWORD max)
+{
+    int ret = 0;
+    while ((ret = module_iterator_next( iter )) > 0)
+    {
+        if (*count >= sizeof(HMODULE))
+        {
+            if (is_win64 && iter->wow64)
+                *module++ = (HMODULE) (DWORD_PTR)iter->ldr_module32.BaseAddress;
+            else
+                *module++ = iter->ldr_module.DllBase;
+            *count -= sizeof(HMODULE);
+        }
+        *size += sizeof(HMODULE);
+        if (max) {
+            max--;
+            if (!max) break;
+        }
+    }
+    return ret;
+}
+
 
 static BOOL get_ldr_module( HANDLE process, HMODULE module, LDR_DATA_TABLE_ENTRY *ldr_module )
 {
     struct module_iterator iter;
     INT ret;
 
-    if (!init_module_iterator( &iter, process )) return FALSE;
+    if (!init_module_iterator( &iter, process, FALSE )) return FALSE;
 
     while ((ret = module_iterator_next( &iter )) > 0)
         /* When hModule is NULL we return the process image - which will be
@@ -862,7 +882,7 @@ static BOOL get_ldr_module32( HANDLE process, HMODULE module, LDR_DATA_TABLE_ENT
     struct module_iterator iter;
     INT ret;
 
-    if (!init_module_iterator( &iter, process )) return FALSE;
+    if (!init_module_iterator( &iter, process, TRUE )) return FALSE;
 
     while ((ret = module_iterator_next( &iter )) > 0)
         /* When hModule is NULL we return the process image - which will be
@@ -926,18 +946,27 @@ BOOL WINAPI /* DECLSPEC_HOTPATCH */ EnumPageFilesW( PENUM_PAGE_FILE_CALLBACKW ca
  *         EnumProcessModules   (kernelbase.@)
  *         K32EnumProcessModules   (kernelbase.@)
  */
-BOOL WINAPI DECLSPEC_HOTPATCH EnumProcessModules( HANDLE process, HMODULE *module,
-                                                  DWORD count, DWORD *needed )
+BOOL WINAPI EnumProcessModulesEx( HANDLE process, HMODULE *module,
+                                  DWORD count, DWORD *needed,
+                                  DWORD filter )
 {
     struct module_iterator iter;
     DWORD size = 0;
-    INT ret;
+    INT ret = 0;
+    BOOL target_is_wow64 = FALSE;
 
     if (process == GetCurrentProcess())
     {
         PPEB_LDR_DATA ldr_data = NtCurrentTeb()->Peb->LdrData;
         PLIST_ENTRY head = &ldr_data->InLoadOrderModuleList;
         PLIST_ENTRY entry = head->Flink;
+
+        if (is_win64 && (filter & LIST_MODULES_32BIT) &&
+                       !(filter & LIST_MODULES_32BIT)) {
+            /* No 32-bit modules in a native 64-bit process */
+            *needed = 0;
+            return TRUE;
+        }
 
         if (count && !module)
         {
@@ -964,7 +993,14 @@ BOOL WINAPI DECLSPEC_HOTPATCH EnumProcessModules( HANDLE process, HMODULE *modul
         return TRUE;
     }
 
-    if (!init_module_iterator( &iter, process )) return FALSE;
+    if ((is_win64 || is_wow64) && !IsWow64Process( process, &target_is_wow64 )) return FALSE;
+
+    if (!is_win64 && is_wow64 && !target_is_wow64)
+    {
+        /* WoW64 process attempting to read the modules of a non-WoW64 process. */
+        SetLastError( ERROR_PARTIAL_COPY );
+        return FALSE;
+    }
 
     if (count && !module)
     {
@@ -972,17 +1008,26 @@ BOOL WINAPI DECLSPEC_HOTPATCH EnumProcessModules( HANDLE process, HMODULE *modul
         return FALSE;
     }
 
-    while ((ret = module_iterator_next( &iter )) > 0)
-    {
-        if (count >= sizeof(HMODULE))
-        {
-            if (sizeof(void *) == 8 && iter.wow64)
-                *module++ = (HMODULE) (DWORD_PTR)iter.ldr_module32.BaseAddress;
-            else
-                *module++ = iter.ldr_module.DllBase;
-            count -= sizeof(HMODULE);
+    /* Handle 32bit WoW64 modules */
+    if (is_win64 && target_is_wow64) {
+        /* Filter flag is ignored for non-64bit processes */
+        if (!filter || (filter & LIST_MODULES_32BIT)) {
+            /* Default behavior is to list the 32-bit executable, but no dlls */
+            BOOL only_main_image = !filter;
+            if (!init_module_iterator( &iter, process, TRUE )) return FALSE;
+            ret = module_iterator_collect(&iter, &size, &count, module, needed,
+                                        only_main_image ? 1 : 0);
         }
-        size += sizeof(HMODULE);
+    }
+
+    /* Handle native modules (either 64 or 32bit) */
+    {
+        BOOL requested_64bit_mods = !filter || (filter & LIST_MODULES_64BIT);
+        if (ret == 0 && (!is_win64 || requested_64bit_mods)) {
+            if (!(ret = !init_module_iterator( &iter, process, FALSE ))) {
+                module_iterator_collect(&iter, &size, &count, module, needed, 0);
+            }
+        }
     }
 
     if (!needed)
@@ -999,11 +1044,10 @@ BOOL WINAPI DECLSPEC_HOTPATCH EnumProcessModules( HANDLE process, HMODULE *modul
  *         EnumProcessModulesEx   (kernelbase.@)
  *         K32EnumProcessModulesEx   (kernelbase.@)
  */
-BOOL WINAPI EnumProcessModulesEx( HANDLE process, HMODULE *module, DWORD count,
-                                  DWORD *needed, DWORD filter )
+BOOL WINAPI DECLSPEC_HOTPATCH EnumProcessModules( HANDLE process, HMODULE *module, DWORD count,
+                                  DWORD *needed )
 {
-    FIXME( "(%p, %p, %d, %p, %d) semi-stub\n", process, module, count, needed, filter );
-    return EnumProcessModules( process, module, count, needed );
+    return EnumProcessModulesEx( process, module, count, needed, 0 );
 }
 
 
@@ -1182,6 +1226,7 @@ DWORD WINAPI DECLSPEC_HOTPATCH GetModuleBaseNameW( HANDLE process, HMODULE modul
                                                    WCHAR *name, DWORD size )
 {
     BOOL wow64;
+    LDR_DATA_TABLE_ENTRY ldr_module;
 
     if (!IsWow64Process( process, &wow64 )) return 0;
 
@@ -1189,22 +1234,22 @@ DWORD WINAPI DECLSPEC_HOTPATCH GetModuleBaseNameW( HANDLE process, HMODULE modul
     {
         LDR_DATA_TABLE_ENTRY32 ldr_module32;
 
-        if (!get_ldr_module32(process, module, &ldr_module32)) return 0;
-        size = min( ldr_module32.BaseDllName.Length / sizeof(WCHAR), size );
-        if (!ReadProcessMemory( process, (void *)(DWORD_PTR)ldr_module32.BaseDllName.Buffer,
-                                name, size * sizeof(WCHAR), NULL ))
-            return 0;
+        if (get_ldr_module32(process, module, &ldr_module32)) {
+            size = min( ldr_module32.BaseDllName.Length / sizeof(WCHAR), size );
+            if (!ReadProcessMemory( process, (void *)(DWORD_PTR)ldr_module32.BaseDllName.Buffer,
+                                    name, size * sizeof(WCHAR), NULL ))
+                return 0;
+            name[size] = 0;
+            return size;
+        }
     }
-    else
-    {
-        LDR_DATA_TABLE_ENTRY ldr_module;
 
-        if (!get_ldr_module( process, module, &ldr_module )) return 0;
-        size = min( ldr_module.BaseDllName.Length / sizeof(WCHAR), size );
-        if (!ReadProcessMemory( process, ldr_module.BaseDllName.Buffer,
-                                name, size * sizeof(WCHAR), NULL ))
-            return 0;
-    }
+    if (!get_ldr_module( process, module, &ldr_module )) return 0;
+    size = min( ldr_module.BaseDllName.Length / sizeof(WCHAR), size );
+    if (!ReadProcessMemory( process, ldr_module.BaseDllName.Buffer,
+                            name, size * sizeof(WCHAR), NULL ))
+        return 0;
+
     name[size] = 0;
     return size;
 }
@@ -1263,6 +1308,7 @@ DWORD WINAPI DECLSPEC_HOTPATCH GetModuleFileNameExW( HANDLE process, HMODULE mod
 {
     BOOL wow64;
     DWORD len;
+    LDR_DATA_TABLE_ENTRY ldr_module;
 
     if (!size) return 0;
 
@@ -1272,23 +1318,22 @@ DWORD WINAPI DECLSPEC_HOTPATCH GetModuleFileNameExW( HANDLE process, HMODULE mod
     {
         LDR_DATA_TABLE_ENTRY32 ldr_module32;
 
-        if (!get_ldr_module32( process, module, &ldr_module32 )) return 0;
-        len = ldr_module32.FullDllName.Length / sizeof(WCHAR);
-        if (!ReadProcessMemory( process, (void *)(DWORD_PTR)ldr_module32.FullDllName.Buffer,
-                                name, min( len, size ) * sizeof(WCHAR), NULL ))
-            return 0;
-    }
-    else
-    {
-        LDR_DATA_TABLE_ENTRY ldr_module;
-
-        if (!get_ldr_module(process, module, &ldr_module)) return 0;
-        len = ldr_module.FullDllName.Length / sizeof(WCHAR);
-        if (!ReadProcessMemory( process, ldr_module.FullDllName.Buffer,
-                                name, min( len, size ) * sizeof(WCHAR), NULL ))
-            return 0;
+        if (get_ldr_module32( process, module, &ldr_module32 )) {
+            len = ldr_module32.FullDllName.Length / sizeof(WCHAR);
+            if (!ReadProcessMemory( process, (void *)(DWORD_PTR)ldr_module32.FullDllName.Buffer,
+                                    name, min( len, size ) * sizeof(WCHAR), NULL ))
+                return 0;
+            goto done;
+        }
     }
 
+    if (!get_ldr_module(process, module, &ldr_module)) return 0;
+    len = ldr_module.FullDllName.Length / sizeof(WCHAR);
+    if (!ReadProcessMemory( process, ldr_module.FullDllName.Buffer,
+                            name, min( len, size ) * sizeof(WCHAR), NULL ))
+        return 0;
+
+done:
     if (len < size)
     {
         name[len] = 0;
@@ -1309,6 +1354,7 @@ DWORD WINAPI DECLSPEC_HOTPATCH GetModuleFileNameExW( HANDLE process, HMODULE mod
 BOOL WINAPI GetModuleInformation( HANDLE process, HMODULE module, MODULEINFO *modinfo, DWORD count )
 {
     BOOL wow64;
+    LDR_DATA_TABLE_ENTRY ldr_module;
 
     if (count < sizeof(MODULEINFO))
     {
@@ -1322,20 +1368,18 @@ BOOL WINAPI GetModuleInformation( HANDLE process, HMODULE module, MODULEINFO *mo
     {
         LDR_DATA_TABLE_ENTRY32 ldr_module32;
 
-        if (!get_ldr_module32( process, module, &ldr_module32 )) return FALSE;
-        modinfo->lpBaseOfDll = (void *)(DWORD_PTR)ldr_module32.BaseAddress;
-        modinfo->SizeOfImage = ldr_module32.SizeOfImage;
-        modinfo->EntryPoint  = (void *)(DWORD_PTR)ldr_module32.EntryPoint;
+        if (get_ldr_module32( process, module, &ldr_module32 )) {
+            modinfo->lpBaseOfDll = (void *)(DWORD_PTR)ldr_module32.BaseAddress;
+            modinfo->SizeOfImage = ldr_module32.SizeOfImage;
+            modinfo->EntryPoint  = (void *)(DWORD_PTR)ldr_module32.EntryPoint;
+            return TRUE;
+        }
     }
-    else
-    {
-        LDR_DATA_TABLE_ENTRY ldr_module;
 
-        if (!get_ldr_module( process, module, &ldr_module )) return FALSE;
-        modinfo->lpBaseOfDll = ldr_module.DllBase;
-        modinfo->SizeOfImage = ldr_module.SizeOfImage;
-        modinfo->EntryPoint  = ldr_module.EntryPoint;
-    }
+    if (!get_ldr_module( process, module, &ldr_module )) return FALSE;
+    modinfo->lpBaseOfDll = ldr_module.DllBase;
+    modinfo->SizeOfImage = ldr_module.SizeOfImage;
+    modinfo->EntryPoint  = ldr_module.EntryPoint;
     return TRUE;
 }
 

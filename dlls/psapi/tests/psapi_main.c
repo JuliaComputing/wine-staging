@@ -73,6 +73,24 @@ static void test_EnumProcesses(void)
     ok(cbUsed == 4, "cbUsed=%d\n", cbUsed);
 }
 
+static ULONG64 main_module, ntdll_module, wow64_module, wow64base_module, wow64cpu_module, wow64win_module, wow64con_module;
+
+static void check_module64( ULONG64 base, const char *name, BOOL allow_unknown )
+{
+    if (!stricmp( name, "notepad.exe" )) { main_module = base; return; }
+#define CHECK_MODULE(mod) if (!stricmp( name, "" #mod ".dll" )) { mod ## _module = base; return; }
+    CHECK_MODULE(ntdll);
+    CHECK_MODULE(wow64);
+    CHECK_MODULE(wow64base);
+    CHECK_MODULE(wow64cpu);
+    CHECK_MODULE(wow64win);
+    CHECK_MODULE(wow64con);
+#undef CHECK_MODULE
+    if (!allow_unknown) {
+        ok( 0, "unknown module %s %s found\n", wine_dbgstr_longlong(base), wine_dbgstr_a(name));
+    }
+}
+
 static void test_EnumProcessModules(void)
 {
     char buffer[200] = "C:\\windows\\system32\\notepad.exe";
@@ -169,6 +187,48 @@ static void test_EnumProcessModules(void)
         ok(info.SizeOfImage, "image size was 0\n");
         ok(info.EntryPoint >= info.lpBaseOfDll, "got entry point %p\n", info.EntryPoint);
 
+        /* Test all EnumProcessModulesEx modes */
+        for (DWORD mode = 0; mode <= 3; ++mode) {
+            HMODULE hMods[128];
+            ret = EnumProcessModulesEx(pi.hProcess, hMods, sizeof(hMods), &cbNeeded, mode);
+            ok(ret == 1, "got %d, error %u\n", ret, GetLastError());
+            ok(cbNeeded != 0, "expected non-zero number of modules for each mode\n");
+            ok(cbNeeded <= sizeof(hMods), "got %u for mode %d\n", cbNeeded/sizeof(HMODULE), mode);
+            ok(cbNeeded % sizeof(hMod) == 0, "got %u\n", cbNeeded);
+
+            main_module = ntdll_module = wow64_module = wow64base_module =
+                wow64cpu_module = wow64win_module = wow64con_module = 0;
+
+            for (DWORD mod = 0; mod < cbNeeded/sizeof(HMODULE); ++mod) {
+                hMod = hMods[mod];
+                ret = GetModuleFileNameExA(pi.hProcess, hMod, name, sizeof(name));
+                ok(ret, "got error %u\n", GetLastError());
+
+                ret = GetModuleBaseNameA(pi.hProcess, hMod, name, sizeof(name));
+                ok(ret, "got error %u\n", GetLastError());
+
+                ret = GetModuleInformation(pi.hProcess, hMod, &info, sizeof(info));
+                ok(ret, "got error %u\n", GetLastError());
+
+                /* In 64bit mode we expect only wow64 support dlls. Everywhere
+                 * else what is returned might differ depending on exactly how this
+                 * was built
+                 */
+                check_module64((ULONG64)hMod, name, mode != LIST_MODULES_64BIT);
+            }
+
+            if (mode == LIST_MODULES_DEFAULT || mode == LIST_MODULES_32BIT) {
+                ok(main_module, "main module not found\n");
+            }
+            /* All modes have some sort of ntdll module */
+            ok(ntdll_module, "ntdll module not found\n");
+            if (mode != LIST_MODULES_32BIT)
+                ok(wow64_module && wow64cpu_module && wow64win_module, "wow64 modules not found\n");
+            else
+                ok(!wow64_module && !wow64base_module && !wow64cpu_module &&
+                   !wow64win_module && !wow64con_module, "wow64 modules found unexpectedly\n");
+        }
+
         TerminateProcess(pi.hProcess, 0);
     }
     else if (wow64)
@@ -184,7 +244,6 @@ static void test_EnumProcessModules(void)
         SetLastError(0xdeadbeef);
         ret = EnumProcessModules(pi.hProcess, &hMod, sizeof(HMODULE), &cbNeeded);
         ok(!ret, "got %d\n", ret);
-todo_wine
         ok(GetLastError() == ERROR_PARTIAL_COPY, "got error %u\n", GetLastError());
 
         TerminateProcess(pi.hProcess, 0);
