@@ -3285,35 +3285,156 @@ __ASM_GLOBAL_FUNC( signal_exit_thread,
                    __ASM_CFI(".cfi_rel_offset %r15,8\n\t")
                    "call *%rsi" )
 
+// X86 DWARF definitions
+#define X86_64_DWARF_RAX 0x00
+#define X86_64_DWARF_RDX 0x01
+#define X86_64_DWARF_RCX 0x02
+#define X86_64_DWARF_RBX 0x03
+#define X86_64_DWARF_RSI 0x04
+#define X86_64_DWARF_RDI 0x05
+#define X86_64_DWARF_RBP 0x06
+#define X86_64_DWARF_RSP 0x07
+#define X86_64_DWARF_R8  0x08
+#define X86_64_DWARF_R9  0x09
+#define X86_64_DWARF_R10 0x0a
+#define X86_64_DWARF_R11 0x0b
+#define X86_64_DWARF_R12 0x0c
+#define X86_64_DWARF_R13 0x0d
+#define X86_64_DWARF_R14 0x0e
+#define X86_64_DWARF_R15 0x0f
+#define X86_64_DWARF_RIP 0x10
+
+// DWARF CFA expressions
+#define DW_CFA_def_cfa_expression "0xf"
+/* DW_CFA_EXPRESSION - register is stored at the *address* returned by this expression */
+#define DW_CFA_expression "0x10"
+
+// DWARF State machine ops
+#define DW_OP_const1u     "0x08"
+#define DW_OP_breg_base   "0x70"
+#define DW_OP_minus       "0x1c"
+#define DW_OP_deref       "0x06"
+#define DW_OP_plus        "0x22"
+#define DW_OP_plus_uconst "0x23"
+
+#define _STR(R) #R
+
+#define __ASM_REG_IS_DEREF_REF_OFFSET(REG_SAVE, REG, OFFSET)   \
+    ".cfi_escape " DW_CFA_expression", "                       \
+    _STR(REG) "," /* The register being saved */               \
+    " 0x02," /* 2 bytes follow */                              \
+    /* DW_OP_breg(REG_SAVE) OFFSET */                          \
+    DW_OP_breg_base " + " _STR(REG_SAVE) ", " #OFFSET ";\n\t"
+
+/* N.B: The argument is SLEB128 encoded, e.g. we're encoding:
+ *
+ * HEX:     0x70
+ * BINARY:  01110000
+ * SLEB128: 11110000 00000000
+ *          |||||||| ||||||||
+ *          |||||||| \------- High bits
+ *          |\------ Low bits
+ *          \- Continuation Bit
+ *
+ * SLEB128: 0xf0 0x00
+ */
+#define __ASM_REG_IS_DEREF_REF_OFFSET2(REG_SAVE, REG, OFFSET1, OFFSET2)   \
+    ".cfi_escape " DW_CFA_expression", "                       \
+    _STR(REG) "," /* The register being saved */               \
+    " 0x03," /* 3 bytes follow */                              \
+    /* DW_OP_breg(REG_SAVE) OFFSET */                          \
+    DW_OP_breg_base " + " _STR(REG_SAVE) ", " #OFFSET1 ", " #OFFSET2 ";\n\t"
+
+#define __ASM_REG_IS_DEREF_REF_OFFSET_MINUS(REG_SAVE, REG, OFFSET, OFFSET_SUB) \
+    ".cfi_escape " DW_CFA_expression", "                       \
+    _STR(REG) "," /* The register being saved */               \
+    " 0x05," /* 5 bytes follow */                              \
+    /* DW_OP_breg(REG_SAVE) OFFSET */                          \
+    DW_OP_breg_base " + " _STR(REG_SAVE) ", " #OFFSET ","      \
+    DW_OP_const1u ", " #OFFSET_SUB "," DW_OP_minus ";\n\t"
+
+#define __ASM_CFA_AT_REG_OFFSET(REG_SAVE, OFFSET1)                          \
+    ".cfi_escape " DW_CFA_def_cfa_expression ","                            \
+    " 0x03," /* 3 bytes follow */                                           \
+    DW_OP_breg_base " + " _STR(REG_SAVE) ", " #OFFSET1 ", "                 \
+    /* N.B.: Ordinarily we would require +8 here, but the syscall dispatcher\
+             pops the return address of the stack, so the saved rsp in the  \
+             CFA */                                                         \
+    DW_OP_deref ";\n\t"                                                     \
+
+#define __ASM_CFA_AT_REG_OFFSET2(REG_SAVE, OFFSET_HIGH, OFFSET_LOW)                        \
+    ".cfi_escape " DW_CFA_def_cfa_expression ","                                           \
+    " 0x04," /* 4 bytes follow */                                                          \
+    DW_OP_breg_base " + " _STR(REG_SAVE) ", " #OFFSET_LOW " | 0x80 , " #OFFSET_HIGH ", "   \
+    DW_OP_deref ";\n\t"
+
+#define __ASM_REG_IS_DEREF_RCX_OFFSET(REG, OFFSET) \
+    __ASM_REG_IS_DEREF_REF_OFFSET(X86_64_DWARF_RCX, REG, OFFSET)
+
+#define __ASM_REG_IS_DEREF_RCX_OFFSET2(REG, OFFSET_HIGH, OFFSET_LOW) \
+    __ASM_REG_IS_DEREF_REF_OFFSET2(X86_64_DWARF_RCX, REG, OFFSET_LOW | 0x80, OFFSET_HIGH)
+
+#define __ASM_REGSAVE_AT_DWARF_REG_MINUS(REG_SAVE, OFFSET_SUB) \
+    /* N.B.: First argument is SLEB128 encoded, so move the high bit over             \
+            to the subtraction */                                                     \
+    __ASM_REG_IS_DEREF_REF_OFFSET_MINUS(REG_SAVE, X86_64_DWARF_RIP, 0x00, OFFSET_SUB - 0x70) \
+    __ASM_REG_IS_DEREF_REF_OFFSET_MINUS(REG_SAVE, X86_64_DWARF_RAX, 0x00, OFFSET_SUB) \
+    __ASM_REG_IS_DEREF_REF_OFFSET_MINUS(REG_SAVE, X86_64_DWARF_RBX, 0x08, OFFSET_SUB) \
+    __ASM_REG_IS_DEREF_REF_OFFSET_MINUS(REG_SAVE, X86_64_DWARF_RDX, 0x18, OFFSET_SUB) \
+    __ASM_REG_IS_DEREF_REF_OFFSET_MINUS(REG_SAVE, X86_64_DWARF_RSI, 0x20, OFFSET_SUB) \
+    __ASM_REG_IS_DEREF_REF_OFFSET_MINUS(REG_SAVE, X86_64_DWARF_RDI, 0x28, OFFSET_SUB) \
+    __ASM_REG_IS_DEREF_REF_OFFSET_MINUS(REG_SAVE, X86_64_DWARF_R12, 0x00, OFFSET_SUB - 0x50) \
+    __ASM_REG_IS_DEREF_REF_OFFSET_MINUS(REG_SAVE, X86_64_DWARF_R14, 0x10, OFFSET_SUB - 0x50) \
+    __ASM_REG_IS_DEREF_REF_OFFSET_MINUS(REG_SAVE, X86_64_DWARF_RSP, 0x08, OFFSET_SUB - 0x80) \
+    /* -0x10 in 7bit 2's complement */                                                       \
+    __ASM_CFA_AT_REG_OFFSET(REG_SAVE, 0x70)                                                  \
+    __ASM_REG_IS_DEREF_REF_OFFSET_MINUS(REG_SAVE, X86_64_DWARF_RBP, 0x18, OFFSET_SUB - 0x80)
+
+
 /***********************************************************************
  *           __wine_syscall_dispatcher
  */
 __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "movq %gs:0x30,%rcx\n\t"
+                    __ASM_CFI(".cfi_undefined rcx\n\t")
                    "movq 0x328(%rcx),%rcx\n\t"     /* amd64_thread_data()->syscall_frame */
                    "popq 0x70(%rcx)\n\t"           /* frame->rip */
+                   ".cfi_adjust_cfa_offset -8\n\t"
+                   __ASM_REG_IS_DEREF_RCX_OFFSET2(X86_64_DWARF_RIP, 0x00, 0x70)
                    "pushfq\n\t"
+                   ".cfi_adjust_cfa_offset 8\n\t"
                    "popq 0x80(%rcx)\n\t"
+                   ".cfi_adjust_cfa_offset -8\n\t"
                    "movl $0,0x94(%rcx)\n\t"        /* frame->restore_flags */
                    ".globl " __ASM_NAME("__wine_syscall_dispatcher_prolog_end") "\n"
                    __ASM_NAME("__wine_syscall_dispatcher_prolog_end") ":\n\t"
                    "movq %rax,0x00(%rcx)\n\t"
+                   __ASM_REG_IS_DEREF_RCX_OFFSET(X86_64_DWARF_RAX, 0x00)
                    "movq %rbx,0x08(%rcx)\n\t"
+                   __ASM_REG_IS_DEREF_RCX_OFFSET(X86_64_DWARF_RBX, 0x08)
                    "movq %rdx,0x18(%rcx)\n\t"
+                   __ASM_REG_IS_DEREF_RCX_OFFSET(X86_64_DWARF_RDX, 0x18)
                    "movq %rsi,0x20(%rcx)\n\t"
+                   __ASM_REG_IS_DEREF_RCX_OFFSET(X86_64_DWARF_RSI, 0x20)
                    "movq %rdi,0x28(%rcx)\n\t"
+                   __ASM_REG_IS_DEREF_RCX_OFFSET(X86_64_DWARF_RDI, 0x28)
                    "movq %r12,0x50(%rcx)\n\t"
+                   __ASM_REG_IS_DEREF_RCX_OFFSET2(X86_64_DWARF_R12, 0x00, 0x50)
                    "movq %r13,0x58(%rcx)\n\t"
                    "movq %r14,0x60(%rcx)\n\t"
+                   __ASM_REG_IS_DEREF_RCX_OFFSET2(X86_64_DWARF_R14, 0x00, 0x60)
                    "movq %r15,0x68(%rcx)\n\t"
                    "movw %cs,0x78(%rcx)\n\t"
                    "movw %ds,0x7a(%rcx)\n\t"
                    "movw %es,0x7c(%rcx)\n\t"
                    "movw %fs,0x7e(%rcx)\n\t"
                    "movq %rsp,0x88(%rcx)\n\t"
+                   __ASM_REG_IS_DEREF_RCX_OFFSET2(X86_64_DWARF_RSP, 0x01, 0x08)
+                   __ASM_CFA_AT_REG_OFFSET2(X86_64_DWARF_RCX, 0x01, 0x08)
                    "movw %ss,0x90(%rcx)\n\t"
                    "movw %gs,0x92(%rcx)\n\t"
                    "movq %rbp,0x98(%rcx)\n\t"
+                   __ASM_REG_IS_DEREF_RCX_OFFSET2(X86_64_DWARF_RBP, 0x01, 0x18)
                    /* Legends of Runeterra hooks the first system call return instruction, and
                     * depends on us returning to it. Adjust the return address accordingly. */
                    "subq $0xb,0x70(%rcx)\n\t"
@@ -3338,6 +3459,8 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "jmp 3f\n"
                    "2:\tfxsave64 0xc0(%rcx)\n"
                    "3:\tleaq 0x98(%rcx),%rbp\n\t"
+                    __ASM_CFI(".cfi_remember_state\n\t")
+                    __ASM_REGSAVE_AT_DWARF_REG_MINUS(X86_64_DWARF_RBP, 0x98)
 #ifdef __linux__
                    "testl $12,%r14d\n\t"           /* SYSCALL_HAVE_PTHREAD_TEB | SYSCALL_HAVE_WRFSGSBASE */
                    "jz 2f\n\t"
@@ -3363,6 +3486,7 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "leaq (%rcx,%rbx,2),%rbx\n\t"
                    "andl $0xfff,%eax\n\t"          /* syscall number */
                    "cmpq 16(%rbx),%rax\n\t"        /* table->ServiceLimit */
+                   __ASM_CFI(".cfi_remember_state\n\t") /* jumps all the way to the end */
                    "jae 5f\n\t"
                    "movq 24(%rbx),%rcx\n\t"        /* table->ArgumentTable */
                    "movzbl (%rcx,%rax),%ecx\n\t"
@@ -3399,36 +3523,59 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "jmp 4f\n"
                    "3:\tfxrstor64 0xc0(%rcx)\n"
                    "4:\tmovq 0x98(%rcx),%rbp\n\t"
+                    __ASM_CFI(".cfi_restore_state\n\t")
                    "movq 0x68(%rcx),%r15\n\t"
+                    __ASM_CFI(".cfi_same_value r15\n\t")
                    "movq 0x60(%rcx),%r14\n\t"
+                    __ASM_CFI(".cfi_same_value r14\n\t")
                    "movq 0x58(%rcx),%r13\n\t"
+                    __ASM_CFI(".cfi_same_value r13\n\t")
                    "movq 0x50(%rcx),%r12\n\t"
+                    __ASM_CFI(".cfi_same_value r12\n\t")
                    "movq 0x28(%rcx),%rdi\n\t"
+                    __ASM_CFI(".cfi_same_value rdi\n\t")
                    "movq 0x20(%rcx),%rsi\n\t"
+                    __ASM_CFI(".cfi_same_value rsi\n\t")
                    "movq 0x08(%rcx),%rbx\n\t"
+                    __ASM_CFI(".cfi_same_value rbx\n\t")
                    "testl $0x3,%edx\n\t"           /* CONTEXT_CONTROL | CONTEXT_INTEGER */
                    "jnz 1f\n\t"
+	           __ASM_CFI(".cfi_remember_state\n\t")
                    "movq 0x80(%rcx),%r11\n\t"      /* frame->eflags */
                    "pushq %r11\n\t"
                    "popfq\n\t"
                    "movq 0x88(%rcx),%rsp\n\t"
+                    __ASM_CFI(".cfi_same_value rsp\n\t")
                    "movq 0x70(%rcx),%rcx\n\t"      /* frame->rip */
+                    __ASM_CFI(".cfi_register rip, rcx\n\t")
                    "jmpq *%rcx\n\t"
                    "1:\tleaq 0x70(%rcx),%rsp\n\t"
+                    __ASM_CFI(".cfi_restore_state\n\t")
+                    __ASM_CFI(".cfi_remember_state\n\t")
                    "testl $0x2,%edx\n\t"           /* CONTEXT_INTEGER */
                    "jnz 1f\n\t"
                    "movq 0x10(%rsp),%r11\n\t"      /* frame->eflags */
                    "movq (%rsp),%rcx\n\t"          /* frame->rip */
+                    __ASM_CFI(".cfi_register rip, rcx\n\t")
                    "iretq\n"
                    "1:\tmovq 0x00(%rcx),%rax\n\t"
+                    __ASM_CFI(".cfi_restore_state\n\t")
+                    __ASM_CFI(".cfi_same_value rax\n\t")
                    "movq 0x18(%rcx),%rdx\n\t"
+                    __ASM_CFI(".cfi_same_value rdx\n\t")
                    "movq 0x30(%rcx),%r8\n\t"
+                    __ASM_CFI(".cfi_same_value r8\n\t")
                    "movq 0x38(%rcx),%r9\n\t"
+                    __ASM_CFI(".cfi_same_value r9\n\t")
                    "movq 0x40(%rcx),%r10\n\t"
+                    __ASM_CFI(".cfi_same_value r10\n\t")
                    "movq 0x48(%rcx),%r11\n\t"
+                    __ASM_CFI(".cfi_same_value r11\n\t")
                    "movq 0x10(%rcx),%rcx\n"
+                    __ASM_REG_IS_DEREF_REF_OFFSET(X86_64_DWARF_RSP, X86_64_DWARF_RIP, 0)
                    "iretq\n"
                    "5:\tmovl $0xc000000d,%edx\n\t" /* STATUS_INVALID_PARAMETER */
+		   __ASM_CFI(".cfi_restore_state\n\t")
                    "movq %rsp,%rcx\n\t"
                    ".globl " __ASM_NAME("__wine_syscall_dispatcher_return") "\n"
                    __ASM_NAME("__wine_syscall_dispatcher_return") ":\n\t"
