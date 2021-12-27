@@ -136,6 +136,7 @@ DECL_HANDLER(set_process_info);
 DECL_HANDLER(get_thread_info);
 DECL_HANDLER(get_thread_times);
 DECL_HANDLER(set_thread_info);
+DECL_HANDLER(cancel_sync);
 DECL_HANDLER(suspend_thread);
 DECL_HANDLER(resume_thread);
 DECL_HANDLER(queue_apc);
@@ -418,6 +419,7 @@ static const req_handler req_handlers[REQ_NB_REQUESTS] =
     (req_handler)req_get_thread_info,
     (req_handler)req_get_thread_times,
     (req_handler)req_set_thread_info,
+    (req_handler)req_cancel_sync,
     (req_handler)req_suspend_thread,
     (req_handler)req_resume_thread,
     (req_handler)req_queue_apc,
@@ -843,6 +845,8 @@ C_ASSERT( FIELD_OFFSET(struct set_thread_info_request, affinity) == 24 );
 C_ASSERT( FIELD_OFFSET(struct set_thread_info_request, entry_point) == 32 );
 C_ASSERT( FIELD_OFFSET(struct set_thread_info_request, token) == 40 );
 C_ASSERT( sizeof(struct set_thread_info_request) == 48 );
+C_ASSERT( FIELD_OFFSET(struct cancel_sync_request, handle) == 12 );
+C_ASSERT( sizeof(struct cancel_sync_request) == 16 );
 C_ASSERT( FIELD_OFFSET(struct suspend_thread_request, handle) == 12 );
 C_ASSERT( sizeof(struct suspend_thread_request) == 16 );
 C_ASSERT( FIELD_OFFSET(struct suspend_thread_reply, count) == 8 );

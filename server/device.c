@@ -79,7 +79,8 @@ static const struct object_ops irp_call_ops =
     no_open_file,                     /* open_file */
     no_kernel_obj_list,               /* get_kernel_obj_list */
     no_close_handle,                  /* close_handle */
-    irp_call_destroy                  /* destroy */
+    irp_call_destroy,                 /* destroy */
+    NULL                              /* sync_cancel */
 };
 
 
@@ -119,7 +120,8 @@ static const struct object_ops device_manager_ops =
     no_open_file,                     /* open_file */
     no_kernel_obj_list,               /* get_kernel_obj_list */
     no_close_handle,                  /* close_handle */
-    device_manager_destroy            /* destroy */
+    device_manager_destroy,           /* destroy */
+    NULL                              /* sync_cancel */
 };
 
 
@@ -176,7 +178,8 @@ static const struct object_ops device_ops =
     device_open_file,                 /* open_file */
     device_get_kernel_obj_list,       /* get_kernel_obj_list */
     no_close_handle,                  /* close_handle */
-    device_destroy                    /* destroy */
+    device_destroy,                   /* destroy */
+    NULL                              /* sync_cancel */
 };
 
 
@@ -228,7 +231,8 @@ static const struct object_ops device_file_ops =
     no_open_file,                     /* open_file */
     device_file_get_kernel_obj_list,  /* get_kernel_obj_list */
     device_file_close_handle,         /* close_handle */
-    device_file_destroy               /* destroy */
+    device_file_destroy,              /* destroy */
+    NULL,                             /* sync_cancel */
 };
 
 static const struct fd_ops device_file_fd_ops =

@@ -153,6 +153,7 @@
 # @ stub NtCancelDeviceWakeupRequest
 @ stdcall -syscall NtCancelIoFile(long ptr)
 @ stdcall -syscall NtCancelIoFileEx(long ptr ptr)
+@ stdcall -syscall NtCancelSynchronousIoFile(long ptr ptr)
 @ stdcall -syscall NtCancelTimer(long ptr)
 @ stdcall -syscall NtClearEvent(long)
 @ stdcall -syscall NtClose(long)

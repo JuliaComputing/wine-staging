@@ -1073,6 +1073,10 @@ typedef struct
 #define SET_THREAD_INFO_DESCRIPTION 0x10
 #define SET_THREAD_INFO_DBG_HIDDEN  0x20
 
+/* Cancel a thread's synchronous I/O operation */
+@REQ(cancel_sync)
+    obj_handle_t handle;       /* thread handle */
+@END
 
 /* Suspend a thread */
 @REQ(suspend_thread)

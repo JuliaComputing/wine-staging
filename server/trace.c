@@ -1598,6 +1598,11 @@ static void dump_set_thread_info_request( const struct set_thread_info_request *
     dump_varargs_unicode_str( ", desc=", cur_size );
 }
 
+static void dump_cancel_sync_request( const struct cancel_sync_request *req )
+{
+    fprintf( stderr, " handle=%04x", req->handle );
+}
+
 static void dump_suspend_thread_request( const struct suspend_thread_request *req )
 {
     fprintf( stderr, " handle=%04x", req->handle );
@@ -4509,6 +4514,7 @@ static const dump_func req_dumpers[REQ_NB_REQUESTS] = {
     (dump_func)dump_get_thread_info_request,
     (dump_func)dump_get_thread_times_request,
     (dump_func)dump_set_thread_info_request,
+    (dump_func)dump_cancel_sync_request,
     (dump_func)dump_suspend_thread_request,
     (dump_func)dump_resume_thread_request,
     (dump_func)dump_queue_apc_request,
@@ -4787,6 +4793,7 @@ static const dump_func reply_dumpers[REQ_NB_REQUESTS] = {
     NULL,
     (dump_func)dump_get_thread_info_reply,
     (dump_func)dump_get_thread_times_reply,
+    NULL,
     NULL,
     (dump_func)dump_suspend_thread_reply,
     (dump_func)dump_resume_thread_reply,
@@ -5067,6 +5074,7 @@ static const char * const req_names[REQ_NB_REQUESTS] = {
     "get_thread_info",
     "get_thread_times",
     "set_thread_info",
+    "cancel_sync",
     "suspend_thread",
     "resume_thread",
     "queue_apc",

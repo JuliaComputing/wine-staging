@@ -68,6 +68,7 @@ static void async_dump( struct object *obj, int verbose );
 static int async_signaled( struct object *obj, struct wait_queue_entry *entry );
 static void async_satisfied( struct object * obj, struct wait_queue_entry *entry );
 static void async_destroy( struct object *obj );
+static void async_sync_cancel(struct object *obj);
 
 static const struct object_ops async_ops =
 {
@@ -90,7 +91,8 @@ static const struct object_ops async_ops =
     no_open_file,              /* open_file */
     no_kernel_obj_list,        /* get_kernel_obj_list */
     no_close_handle,           /* close_handle */
-    async_destroy              /* destroy */
+    async_destroy,             /* destroy */
+    async_sync_cancel          /* sync_cancel */
 };
 
 static inline void async_reselect( struct async *async )
@@ -208,6 +210,14 @@ void async_terminate( struct async *async, unsigned int status )
     async_reselect( async );
 
     release_object( async );
+}
+
+static void async_sync_cancel(struct object *obj)
+{
+    struct async *async = (struct async *)obj;
+    assert( obj->ops == &async_ops );
+
+    fd_cancel_async( async->fd, async );
 }
 
 /* callback for timeout on an async request */
@@ -646,7 +656,8 @@ static const struct object_ops iosb_ops =
     no_open_file,             /* open_file */
     no_kernel_obj_list,       /* get_kernel_obj_list */
     no_close_handle,          /* close_handle */
-    iosb_destroy              /* destroy */
+    iosb_destroy,             /* destroy */
+    NULL                      /* sync_cancel */
 };
 
 static void iosb_dump( struct object *obj, int verbose )

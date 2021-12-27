@@ -118,7 +118,8 @@ static const struct object_ops process_ops =
     no_open_file,                /* open_file */
     process_get_kernel_obj_list, /* get_kernel_obj_list */
     no_close_handle,             /* close_handle */
-    process_destroy              /* destroy */
+    process_destroy,             /* destroy */
+    NULL                         /* sync_cancel */
 };
 
 static const struct fd_ops process_fd_ops =
@@ -169,7 +170,8 @@ static const struct object_ops startup_info_ops =
     no_open_file,                  /* open_file */
     no_kernel_obj_list,            /* get_kernel_obj_list */
     no_close_handle,               /* close_handle */
-    startup_info_destroy           /* destroy */
+    startup_info_destroy,          /* destroy */
+    NULL                           /* sync_cancel */
 };
 
 /* job object */
@@ -230,7 +232,8 @@ static const struct object_ops job_ops =
     no_open_file,                  /* open_file */
     no_kernel_obj_list,            /* get_kernel_obj_list */
     job_close_handle,              /* close_handle */
-    job_destroy                    /* destroy */
+    job_destroy,                   /* destroy */
+    NULL                           /* sync_cancel */
 };
 
 static struct job *create_job_object( struct object *root, const struct unicode_str *name,

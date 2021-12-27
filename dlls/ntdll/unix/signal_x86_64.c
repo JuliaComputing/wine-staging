@@ -2832,6 +2832,16 @@ static void usr1_handler( int signal, siginfo_t *siginfo, void *ucontext )
     }
 }
 
+/**********************************************************************
+ *		usr1_handler
+ *
+ * Handler for SIGIO, used to signal a thread to cancel its IO operations.
+ */
+static void io_handler( int signal, siginfo_t *siginfo, void *ucontext )
+{
+    ntdll_get_thread_data()->cancel_sync = TRUE;
+}
+
 
 /***********************************************************************
  *           LDT support
@@ -3084,7 +3094,7 @@ void signal_init_thread( TEB *teb )
  */
 void signal_init_process(void)
 {
-    struct sigaction sig_act;
+    struct sigaction sig_act, sig_act_no_restart;
     void *ptr, *kernel_stack = (char *)ntdll_get_thread_data()->kernel_stack + kernel_stack_size;
 
     amd64_thread_data()->syscall_frame = (struct syscall_frame *)kernel_stack - 1;
@@ -3141,7 +3151,11 @@ void signal_init_process(void)
 #endif
 
     sig_act.sa_mask = server_block_set;
+
+    memcpy(&sig_act_no_restart, &sig_act, sizeof(struct sigaction));
+
     sig_act.sa_flags = SA_SIGINFO | SA_RESTART | SA_ONSTACK;
+    sig_act_no_restart.sa_flags = SA_SIGINFO | SA_ONSTACK;
 
     sig_act.sa_sigaction = int_handler;
     if (sigaction( SIGINT, &sig_act, NULL ) == -1) goto error;
@@ -3155,6 +3169,8 @@ void signal_init_process(void)
     if (sigaction( SIGUSR1, &sig_act, NULL ) == -1) goto error;
     sig_act.sa_sigaction = trap_handler;
     if (sigaction( SIGTRAP, &sig_act, NULL ) == -1) goto error;
+    sig_act_no_restart.sa_sigaction = io_handler;
+    if (sigaction( SIGIO, &sig_act_no_restart, NULL ) == -1) goto error;
     sig_act.sa_sigaction = segv_handler;
     if (sigaction( SIGSEGV, &sig_act, NULL ) == -1) goto error;
     if (sigaction( SIGILL, &sig_act, NULL ) == -1) goto error;

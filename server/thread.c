@@ -51,7 +51,6 @@
 #include "user.h"
 #include "security.h"
 
-
 /* thread queues */
 
 struct thread_wait
@@ -109,7 +108,8 @@ static const struct object_ops thread_apc_ops =
     no_open_file,               /* open_file */
     no_kernel_obj_list,         /* get_kernel_obj_list */
     no_close_handle,            /* close_handle */
-    thread_apc_destroy          /* destroy */
+    thread_apc_destroy,         /* destroy */
+    NULL                        /* sync_cancel */
 };
 
 
@@ -154,7 +154,8 @@ static const struct object_ops context_ops =
     no_open_file,               /* open_file */
     no_kernel_obj_list,         /* get_kernel_obj_list */
     no_close_handle,            /* close_handle */
-    no_destroy                  /* destroy */
+    no_destroy,                 /* destroy */
+    NULL                        /* sync_cancel */
 };
 
 
@@ -203,7 +204,8 @@ static const struct object_ops thread_ops =
     no_open_file,               /* open_file */
     thread_get_kernel_obj_list, /* get_kernel_obj_list */
     no_close_handle,            /* close_handle */
-    destroy_thread              /* destroy */
+    destroy_thread,             /* destroy */
+    NULL                        /* sync_cancel */
 };
 
 static const struct fd_ops thread_fd_ops =
@@ -668,6 +670,13 @@ static void set_thread_info( struct thread *thread,
     }
 }
 
+/* send a thread an I/O cancellation signal */
+void cancel_thread_io( struct thread *thread )
+{
+    /* can't signal a thread while initialisation is in progress */
+    if (is_process_init_done(thread->process)) send_thread_signal( thread, SIGIO );
+}
+
 /* stop a thread (at the Unix level) */
 void stop_thread( struct thread *thread )
 {
@@ -862,6 +871,15 @@ static int check_wait( struct thread *thread )
     if (wait->when >= 0 && wait->when <= current_time) return STATUS_TIMEOUT;
     if (wait->when < 0 && -wait->when <= monotonic_time) return STATUS_TIMEOUT;
     return -1;
+}
+
+/* request cancelation of all waited on objects in the given thread */
+static void cancel_sync_io(struct thread_wait *wait) {
+    int i;
+    struct wait_queue_entry *entry;
+    for (i = 0, entry = wait->queues; i < wait->count; i++, entry++)
+        if (entry->obj->ops->sync_cancel)
+            entry->obj->ops->sync_cancel( entry->obj );
 }
 
 /* send the wakeup signal to a thread */
@@ -1463,6 +1481,27 @@ DECL_HANDLER(terminate_thread)
         if (thread != current) kill_thread( thread, 1 );
         else reply->self = 1;
         cancel_terminating_thread_asyncs( thread );
+        release_object( thread );
+    }
+}
+
+/* terminate a thread's IO operation */
+DECL_HANDLER(cancel_sync)
+{
+    struct thread *thread;
+
+    if ((thread = get_thread_from_handle( req->handle, THREAD_TERMINATE )))
+    {
+        if (thread != current) {
+            if (thread->wait) {
+                /* Thread is currently blocked on wineserver. Cancel any I/O operations we may be
+                   waiting for. */
+                cancel_sync_io( thread->wait );
+            } else {
+                /* Thread is not blocked in wine, but could be blocked in userspace. Send a signal */
+                cancel_thread_io( thread );
+            }
+        }
         release_object( thread );
     }
 }

@@ -107,7 +107,8 @@ static const struct object_ops file_ops =
     file_open_file,               /* open_file */
     file_get_kernel_obj_list,     /* get_kernel_obj_list */
     no_close_handle,              /* close_handle */
-    file_destroy                  /* destroy */
+    file_destroy,                 /* destroy */
+    NULL                          /* sync_cancel */
 };
 
 static const struct fd_ops file_fd_ops =

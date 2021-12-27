@@ -5198,6 +5198,7 @@ NTSTATUS WINAPI NtReadFile( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, vo
         }
     }
 
+    ntdll_get_thread_data()->cancel_sync = FALSE;
     for (;;)
     {
         if ((result = virtual_locked_read( unix_handle, (char *)buffer + total, length - total )) >= 0)
@@ -5279,6 +5280,14 @@ NTSTATUS WINAPI NtReadFile( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, vo
             if (ret == -1 && errno != EINTR)
             {
                 status = errno_to_status( errno );
+                goto done;
+            }
+            if (ntdll_get_thread_data()->cancel_sync) {
+                /* The application explicitly requested cancelation using CancelSynchronousIo */
+                if (total) /* return with what we got so far */
+                    status = STATUS_SUCCESS;
+                else
+                    status = STATUS_CANCELLED;
                 goto done;
             }
             /* will now restart the read */
@@ -5934,7 +5943,6 @@ NTSTATUS WINAPI NtFlushBuffersFile( HANDLE handle, IO_STATUS_BLOCK *io )
     return ret;
 }
 
-
 /**************************************************************************
  *           NtCancelIoFile   (NTDLL.@)
  */
@@ -5984,6 +5992,34 @@ NTSTATUS WINAPI NtCancelIoFileEx( HANDLE handle, IO_STATUS_BLOCK *io, IO_STATUS_
     return status;
 }
 
+
+/**************************************************************************
+ *           NtCancelSynchronousIoFile   (NTDLL.@)
+ */
+NTSTATUS WINAPI NtCancelSynchronousIoFile( HANDLE thread, IO_STATUS_BLOCK *io, IO_STATUS_BLOCK *io_status )
+{
+    NTSTATUS status;
+
+    TRACE( "%p %p %p\n", thread, io, io_status );
+
+    if (io) {
+        FIXME("NtCancelSynchronousIoFile with non-NULL io object not implemented!\n");
+        return STATUS_NOT_IMPLEMENTED;
+    }
+
+    SERVER_START_REQ( cancel_sync )
+    {
+        req->handle = wine_server_obj_handle( thread );
+        if (!(status = wine_server_call( req )))
+        {
+            io_status->u.Status = status;
+            io_status->Information = 0;
+        }
+    }
+    SERVER_END_REQ;
+
+    return status;
+}
 
 /******************************************************************
  *           NtLockFile   (NTDLL.@)
