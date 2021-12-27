@@ -94,7 +94,8 @@ static const struct object_ops console_ops =
     console_open_file,                /* open_file */
     no_kernel_obj_list,               /* get_kernel_obj_list */
     no_close_handle,                  /* close_handle */
-    console_destroy                   /* destroy */
+    console_destroy,                  /* destroy */
+    NULL                              /* sync_cancel */
 };
 
 static enum server_fd_type console_get_fd_type( struct fd *fd );
@@ -171,7 +172,8 @@ static const struct object_ops console_server_ops =
     console_server_open_file,         /* open_file */
     no_kernel_obj_list,               /* get_kernel_obj_list */
     no_close_handle,                  /* close_handle */
-    console_server_destroy            /* destroy */
+    console_server_destroy,           /* destroy */
+    NULL                              /* sync_cancel */
 };
 
 static void console_server_ioctl( struct fd *fd, ioctl_code_t code, struct async *async );
@@ -240,7 +242,8 @@ static const struct object_ops screen_buffer_ops =
     screen_buffer_open_file,          /* open_file */
     no_kernel_obj_list,               /* get_kernel_obj_list */
     no_close_handle,                  /* close_handle */
-    screen_buffer_destroy             /* destroy */
+    screen_buffer_destroy,            /* destroy */
+    NULL                              /* sync_cancel */
 };
 
 static void screen_buffer_write( struct fd *fd, struct async *async, file_pos_t pos );
@@ -289,7 +292,8 @@ static const struct object_ops console_device_ops =
     console_device_open_file,         /* open_file */
     no_kernel_obj_list,               /* get_kernel_obj_list */
     no_close_handle,                  /* close_handle */
-    no_destroy                        /* destroy */
+    no_destroy,                       /* destroy */
+    NULL                              /* sync_cancel */
 };
 
 struct console_input
@@ -326,7 +330,8 @@ static const struct object_ops console_input_ops =
     console_input_open_file,          /* open_file */
     no_kernel_obj_list,               /* get_kernel_obj_list */
     no_close_handle,                  /* close_handle */
-    console_input_destroy             /* destroy */
+    console_input_destroy,            /* destroy */
+    NULL                              /* sync_cancel */
 };
 
 static void console_input_read( struct fd *fd, struct async *async, file_pos_t pos );
@@ -383,7 +388,8 @@ static const struct object_ops console_output_ops =
     console_output_open_file,         /* open_file */
     no_kernel_obj_list,               /* get_kernel_obj_list */
     no_close_handle,                  /* close_handle */
-    console_output_destroy            /* destroy */
+    console_output_destroy,           /* destroy */
+    NULL                              /* sync_cancel */
 };
 
 static void console_output_write( struct fd *fd, struct async *async, file_pos_t pos );
@@ -441,7 +447,8 @@ static const struct object_ops console_connection_ops =
     console_connection_open_file,     /* open_file */
     no_kernel_obj_list,               /* get_kernel_obj_list */
     console_connection_close_handle,  /* close_handle */
-    console_connection_destroy        /* destroy */
+    console_connection_destroy,       /* destroy */
+    NULL                              /* sync_cancel */
 };
 
 static void console_connection_ioctl( struct fd *fd, ioctl_code_t code, struct async *async );

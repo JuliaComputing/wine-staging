@@ -219,7 +219,8 @@ static const struct object_ops fd_ops =
     no_open_file,             /* open_file */
     no_kernel_obj_list,       /* get_kernel_obj_list */
     no_close_handle,          /* close_handle */
-    fd_destroy                /* destroy */
+    fd_destroy,               /* destroy */
+    NULL                      /* sync_cancel */
 };
 
 /* device object */
@@ -260,7 +261,8 @@ static const struct object_ops device_ops =
     no_open_file,             /* open_file */
     no_kernel_obj_list,       /* get_kernel_obj_list */
     no_close_handle,          /* close_handle */
-    device_destroy            /* destroy */
+    device_destroy,           /* destroy */
+    NULL                      /* sync_cancel */
 };
 
 /* inode object */
@@ -300,7 +302,8 @@ static const struct object_ops inode_ops =
     no_open_file,             /* open_file */
     no_kernel_obj_list,       /* get_kernel_obj_list */
     no_close_handle,          /* close_handle */
-    inode_destroy             /* destroy */
+    inode_destroy,            /* destroy */
+    NULL                      /* sync_cancel */
 };
 
 /* file lock object */
@@ -342,7 +345,8 @@ static const struct object_ops file_lock_ops =
     no_open_file,               /* open_file */
     no_kernel_obj_list,         /* get_kernel_obj_list */
     no_close_handle,            /* close_handle */
-    no_destroy                  /* destroy */
+    no_destroy,                 /* destroy */
+    NULL                        /* sync_cancel */
 };
 
 

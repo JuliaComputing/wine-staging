@@ -41,6 +41,7 @@ static const WORD current_machine = IMAGE_FILE_MACHINE_ARM64;
 #endif
 extern WORD native_machine DECLSPEC_HIDDEN;
 
+
 static const BOOL is_win64 = (sizeof(void *) > sizeof(int));
 
 static inline BOOL is_machine_64bit( WORD machine )
@@ -61,6 +62,7 @@ struct ntdll_thread_data
     PRTL_THREAD_START_ROUTINE start;  /* thread entry point */
     void              *param;         /* thread entry point parameter */
     void              *jmp_buf;       /* setjmp buffer for exception handling */
+    volatile BOOL      cancel_sync;   /* synchronous cancellation request */
 };
 
 C_ASSERT( sizeof(struct ntdll_thread_data) <= sizeof(((TEB *)0)->GdiTebBatch) );

@@ -89,7 +89,8 @@ static const struct object_ops timer_ops =
     no_open_file,              /* open_file */
     no_kernel_obj_list,        /* get_kernel_obj_list */
     no_close_handle,           /* close_handle */
-    timer_destroy              /* destroy */
+    timer_destroy,             /* destroy */
+    NULL                       /* sync_cancel */
 };
 
 
