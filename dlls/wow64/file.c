@@ -226,6 +226,22 @@ NTSTATUS WINAPI wow64_NtCancelIoFileEx( UINT *args )
     return status;
 }
 
+/**********************************************************************
+ *           wow64_NtCancelSynchronousIoFile
+ */
+NTSTATUS WINAPI wow64_NtCancelSynchronousIoFile( UINT *args )
+{
+    HANDLE handle = get_handle( &args );
+    IO_STATUS_BLOCK32 *io_ptr = get_ptr( &args );
+    IO_STATUS_BLOCK32 *io32 = get_ptr( &args );
+
+    IO_STATUS_BLOCK io;
+    NTSTATUS status;
+
+    status = NtCancelSynchronousIoFile( handle, (IO_STATUS_BLOCK *)io_ptr, iosb_32to64( &io, io32 ));
+    put_iosb( io32, &io );
+    return status;
+}
 
 /**********************************************************************
  *           wow64_NtCreateFile

@@ -107,6 +107,8 @@ struct object_ops
     int (*close_handle)(struct object *,struct process *,obj_handle_t);
     /* destroy on refcount == 0 */
     void (*destroy)(struct object *);
+    /* cancel operation if a synchronous i/o operation */
+    void (*sync_cancel)(struct object *);
 };
 
 struct object

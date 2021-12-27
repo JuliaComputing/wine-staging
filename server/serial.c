@@ -98,7 +98,8 @@ static const struct object_ops serial_ops =
     no_open_file,                 /* open_file */
     no_kernel_obj_list,           /* get_kernel_obj_list */
     no_close_handle,              /* close_handle */
-    serial_destroy                /* destroy */
+    serial_destroy,               /* destroy */
+    NULL                          /* sync_cancel */
 };
 
 static const struct fd_ops serial_fd_ops =

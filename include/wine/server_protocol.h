@@ -1147,6 +1147,16 @@ struct set_thread_info_reply
 #define SET_THREAD_INFO_DBG_HIDDEN  0x20
 
 
+struct cancel_sync_request
+{
+    struct request_header __header;
+    obj_handle_t handle;
+};
+struct cancel_sync_reply
+{
+    struct reply_header __header;
+};
+
 
 struct suspend_thread_request
 {
@@ -5425,6 +5435,7 @@ enum request
     REQ_get_thread_info,
     REQ_get_thread_times,
     REQ_set_thread_info,
+    REQ_cancel_sync,
     REQ_suspend_thread,
     REQ_resume_thread,
     REQ_queue_apc,
@@ -5706,6 +5717,7 @@ union generic_request
     struct get_thread_info_request get_thread_info_request;
     struct get_thread_times_request get_thread_times_request;
     struct set_thread_info_request set_thread_info_request;
+    struct cancel_sync_request cancel_sync_request;
     struct suspend_thread_request suspend_thread_request;
     struct resume_thread_request resume_thread_request;
     struct queue_apc_request queue_apc_request;
@@ -5985,6 +5997,7 @@ union generic_reply
     struct get_thread_info_reply get_thread_info_reply;
     struct get_thread_times_reply get_thread_times_reply;
     struct set_thread_info_reply set_thread_info_reply;
+    struct cancel_sync_reply cancel_sync_reply;
     struct suspend_thread_reply suspend_thread_reply;
     struct resume_thread_reply resume_thread_reply;
     struct queue_apc_reply queue_apc_reply;
@@ -6246,7 +6259,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 739
+#define SERVER_PROTOCOL_VERSION 740
 
 /* ### protocol_version end ### */
 

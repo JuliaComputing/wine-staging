@@ -138,6 +138,7 @@ static void * const syscalls[] =
     NtCallbackReturn,
     NtCancelIoFile,
     NtCancelIoFileEx,
+    NtCancelSynchronousIoFile,
     NtCancelTimer,
     NtClearEvent,
     NtClose,
