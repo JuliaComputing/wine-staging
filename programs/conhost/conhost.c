@@ -2492,11 +2492,18 @@ static NTSTATUS screen_buffer_ioctl( struct screen_buffer *screen_buffer, unsign
             return STATUS_SUCCESS;
         }
 
-    case IOCTL_CONDRV_SET_MODE:
+    case IOCTL_CONDRV_SET_MODE: {
+        unsigned int new_mode;
         if (in_size != sizeof(unsigned int) || *out_size) return STATUS_INVALID_PARAMETER;
-        screen_buffer->mode = *(unsigned int *)in_data;
+        new_mode = *(unsigned int *)in_data;
+        /* We currently do not support VT100 output processing, so deny setting that mode to
+           signal to the client application to use vanilla windows APIs instead. */
+        if (new_mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+            return STATUS_NOT_SUPPORTED;
+        screen_buffer->mode = new_mode;
         TRACE( "set %x mode\n", screen_buffer->mode );
         return STATUS_SUCCESS;
+    }
 
     case IOCTL_CONDRV_IS_UNIX:
         return screen_buffer->console->is_unix ? STATUS_SUCCESS : STATUS_NOT_SUPPORTED;
