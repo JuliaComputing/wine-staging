@@ -1455,7 +1455,14 @@ static NTSTATUS read_console( struct console *console, unsigned int ioctl, size_
     ctx->ctrl_mask = ctrl_mask;
 
     console->pending_read = out_size;
-    return process_console_input( console );
+
+    /* If there are any pending input records, cook them now. */
+    if (console->record_count)
+    {
+        process_console_input( console );
+    }
+
+    return console->edit_line.status;
 }
 
 /* add input events to a console input queue */
