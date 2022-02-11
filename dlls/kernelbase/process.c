@@ -403,11 +403,11 @@ static NTSTATUS create_cmd_process( HANDLE token, HANDLE debug, SECURITY_ATTRIBU
  */
 BOOL WINAPI DECLSPEC_HOTPATCH CloseHandle( HANDLE handle )
 {
-    if (handle == (HANDLE)STD_INPUT_HANDLE)
+    if ((DWORD)(DWORD_PTR)handle == STD_INPUT_HANDLE)
         handle = InterlockedExchangePointer( &NtCurrentTeb()->Peb->ProcessParameters->hStdInput, 0 );
-    else if (handle == (HANDLE)STD_OUTPUT_HANDLE)
+    else if ((DWORD)(DWORD_PTR)handle == STD_OUTPUT_HANDLE)
         handle = InterlockedExchangePointer( &NtCurrentTeb()->Peb->ProcessParameters->hStdOutput, 0 );
-    else if (handle == (HANDLE)STD_ERROR_HANDLE)
+    else if ((DWORD)(DWORD_PTR)handle == STD_ERROR_HANDLE)
         handle = InterlockedExchangePointer( &NtCurrentTeb()->Peb->ProcessParameters->hStdError, 0 );
 
     return set_ntstatus( NtClose( handle ));
@@ -768,6 +768,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetHandleInformation( HANDLE handle, DWORD *flags 
 {
     OBJECT_DATA_INFORMATION info;
 
+    if ((DWORD)(DWORD_PTR)handle == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)handle == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)handle == STD_ERROR_HANDLE)
+        handle = GetStdHandle((DWORD_PTR)handle);
+
     if (!set_ntstatus( NtQueryObject( handle, ObjectDataInformation, &info, sizeof(info), NULL )))
         return FALSE;
 
@@ -1083,6 +1086,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH SetHandleInformation( HANDLE handle, DWORD mask, D
 {
     OBJECT_DATA_INFORMATION info;
 
+    if ((DWORD)(DWORD_PTR)handle == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)handle == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)handle == STD_ERROR_HANDLE)
+        handle = GetStdHandle((DWORD_PTR)handle);
+
     /* if not setting both fields, retrieve current value first */
     if ((mask & (HANDLE_FLAG_INHERIT | HANDLE_FLAG_PROTECT_FROM_CLOSE)) !=
         (HANDLE_FLAG_INHERIT | HANDLE_FLAG_PROTECT_FROM_CLOSE))
@@ -1302,6 +1308,8 @@ HANDLE WINAPI DECLSPEC_HOTPATCH GetStdHandle( DWORD std_handle )
  */
 BOOL WINAPI DECLSPEC_HOTPATCH SetStdHandle( DWORD std_handle, HANDLE handle )
 {
+    /* Windows does not appear to process handle with GetStdHandle */
+
     switch (std_handle)
     {
     case STD_INPUT_HANDLE:  NtCurrentTeb()->Peb->ProcessParameters->hStdInput = handle;  return TRUE;
@@ -1319,6 +1327,8 @@ BOOL WINAPI DECLSPEC_HOTPATCH SetStdHandle( DWORD std_handle, HANDLE handle )
 BOOL WINAPI DECLSPEC_HOTPATCH SetStdHandleEx( DWORD std_handle, HANDLE handle, HANDLE *prev )
 {
     HANDLE *ptr;
+
+    /* Windows does not appear to process handle with GetStdHandle */
 
     switch (std_handle)
     {
