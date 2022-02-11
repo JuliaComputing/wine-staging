@@ -2891,6 +2891,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH CancelIoEx( HANDLE handle, LPOVERLAPPED overlapped
 {
     IO_STATUS_BLOCK io;
 
+    if ((DWORD)(DWORD_PTR)handle == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)handle == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)handle == STD_ERROR_HANDLE)
+        handle = GetStdHandle((DWORD_PTR)handle);
+
     return set_ntstatus( NtCancelIoFileEx( handle, (PIO_STATUS_BLOCK)overlapped, &io ) );
 }
 
@@ -2913,6 +2916,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH FlushFileBuffers( HANDLE file )
 {
     IO_STATUS_BLOCK iosb;
 
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
+
     return set_ntstatus( NtFlushBuffersFile( file, &iosb ));
 }
 
@@ -2926,6 +2932,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetFileInformationByHandle( HANDLE file, BY_HANDLE
     FILE_ALL_INFORMATION all_info;
     IO_STATUS_BLOCK io;
     NTSTATUS status;
+
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
 
     status = NtQueryInformationFile( file, &io, &all_info, sizeof(all_info), FileAllInformation );
     if (status == STATUS_BUFFER_OVERFLOW) status = STATUS_SUCCESS;
@@ -2961,6 +2970,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetFileInformationByHandleEx( HANDLE handle, FILE_
 {
     NTSTATUS status;
     IO_STATUS_BLOCK io;
+
+    if ((DWORD)(DWORD_PTR)handle == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)handle == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)handle == STD_ERROR_HANDLE)
+        handle = GetStdHandle((DWORD_PTR)handle);
 
     switch (class)
     {
@@ -3047,6 +3059,9 @@ DWORD WINAPI DECLSPEC_HOTPATCH GetFileSize( HANDLE file, LPDWORD size_high )
 {
     LARGE_INTEGER size;
 
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
+
     if (!GetFileSizeEx( file, &size )) return INVALID_FILE_SIZE;
     if (size_high) *size_high = size.u.HighPart;
     if (size.u.LowPart == INVALID_FILE_SIZE) SetLastError( 0 );
@@ -3061,6 +3076,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetFileSizeEx( HANDLE file, PLARGE_INTEGER size )
 {
     FILE_STANDARD_INFORMATION info;
     IO_STATUS_BLOCK io;
+
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
 
     if (!set_ntstatus( NtQueryInformationFile( file, &io, &info, sizeof(info), FileStandardInformation )))
         return FALSE;
@@ -3078,6 +3096,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetFileTime( HANDLE file, FILETIME *creation,
 {
     FILE_BASIC_INFORMATION info;
     IO_STATUS_BLOCK io;
+
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
 
     if (!set_ntstatus( NtQueryInformationFile( file, &io, &info, sizeof(info), FileBasicInformation )))
         return FALSE;
@@ -3109,10 +3130,8 @@ DWORD WINAPI DECLSPEC_HOTPATCH GetFileType( HANDLE file )
     FILE_FS_DEVICE_INFORMATION info;
     IO_STATUS_BLOCK io;
 
-    if (file == (HANDLE)STD_INPUT_HANDLE ||
-        file == (HANDLE)STD_OUTPUT_HANDLE ||
-        file == (HANDLE)STD_ERROR_HANDLE)
-        file = GetStdHandle( (DWORD_PTR)file );
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
 
     if (!set_ntstatus( NtQueryVolumeInformationFile( file, &io, &info, sizeof(info),
                                                      FileFsDeviceInformation )))
@@ -3141,6 +3160,9 @@ DWORD WINAPI DECLSPEC_HOTPATCH GetFileType( HANDLE file )
 BOOL WINAPI DECLSPEC_HOTPATCH GetOverlappedResult( HANDLE file, LPOVERLAPPED overlapped,
                                                    LPDWORD result, BOOL wait )
 {
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
+
     return GetOverlappedResultEx( file, overlapped, result, wait ? INFINITE : 0, FALSE );
 }
 
@@ -3155,6 +3177,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetOverlappedResultEx( HANDLE file, OVERLAPPED *ov
     DWORD ret;
 
     TRACE( "(%p %p %p %lu %d)\n", file, overlapped, result, timeout, alertable );
+
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
 
     status = overlapped->Internal;
     if (status == STATUS_PENDING)
@@ -3192,6 +3217,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH LockFile( HANDLE file, DWORD offset_low, DWORD off
 
     TRACE( "%p %lx%08lx %lx%08lx\n", file, offset_high, offset_low, count_high, count_low );
 
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
+
     count.u.LowPart = count_low;
     count.u.HighPart = count_high;
     offset.u.LowPart = offset_low;
@@ -3217,6 +3245,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH LockFileEx( HANDLE file, DWORD flags, DWORD reserv
 
     TRACE( "%p %lx%08lx %lx%08lx flags %lx\n",
            file, overlapped->u.s.OffsetHigh, overlapped->u.s.Offset, count_high, count_low, flags );
+
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
 
     count.u.LowPart = count_low;
     count.u.HighPart = count_high;
@@ -3311,6 +3342,9 @@ HANDLE WINAPI DECLSPEC_HOTPATCH ReOpenFile( HANDLE handle, DWORD access, DWORD s
         attr.SecurityQualityOfService = &qos;
     }
 
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
+
     status = NtCreateFile( &file, access | SYNCHRONIZE | FILE_READ_ATTRIBUTES, &attr, &io, NULL,
                            0, sharing, FILE_OPEN, get_nt_file_options( attributes ), NULL, 0 );
     if (!set_ntstatus( status ))
@@ -3402,6 +3436,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH ReadFile( HANDLE file, LPVOID buffer, DWORD count,
     else io_status->Information = 0;
     io_status->u.Status = STATUS_PENDING;
 
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
+
     status = NtReadFile( file, event, NULL, cvalue, io_status, buffer, count, poffset, NULL);
 
     if (status == STATUS_PENDING && !overlapped)
@@ -3453,6 +3490,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH ReadFileEx( HANDLE file, LPVOID buffer, DWORD coun
     io->u.Status = STATUS_PENDING;
     io->Information = 0;
 
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
+
     status = NtReadFile( file, NULL, read_write_apc, completion, io, buffer, count, &offset, NULL);
     if (status == STATUS_PENDING) return TRUE;
     return set_ntstatus( status );
@@ -3477,6 +3517,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH ReadFileScatter( HANDLE file, FILE_SEGMENT_ELEMENT
     io = (PIO_STATUS_BLOCK)overlapped;
     io->u.Status = STATUS_PENDING;
     io->Information = 0;
+
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
 
     return set_ntstatus( NtReadFileScatter( file, overlapped->hEvent, NULL, cvalue, io,
                                             segments, count, &offset, NULL ));
@@ -3537,6 +3580,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH SetEndOfFile( HANDLE file )
     IO_STATUS_BLOCK io;
     NTSTATUS status;
 
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
+
     if (!(status = NtQueryInformationFile( file, &io, &pos, sizeof(pos), FilePositionInformation )))
     {
         eof.EndOfFile = pos.CurrentByteOffset;
@@ -3556,6 +3602,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH SetFileInformationByHandle( HANDLE file, FILE_INFO
     IO_STATUS_BLOCK io;
 
     TRACE( "%p %u %p %lu\n", file, class, info, size );
+
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
 
     switch (class)
     {
@@ -3635,6 +3684,9 @@ DWORD WINAPI DECLSPEC_HOTPATCH SetFilePointer( HANDLE file, LONG distance, LONG 
     }
     else dist.QuadPart = distance;
 
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
+
     if (!SetFilePointerEx( file, dist, &newpos, method )) return INVALID_SET_FILE_POINTER;
 
     if (highword) *highword = newpos.u.HighPart;
@@ -3653,6 +3705,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH SetFilePointerEx( HANDLE file, LARGE_INTEGER dista
     IO_STATUS_BLOCK io;
     FILE_POSITION_INFORMATION info;
     FILE_STANDARD_INFORMATION eof;
+
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
 
     switch(method)
     {
@@ -3718,6 +3773,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH SetFileTime( HANDLE file, const FILETIME *ctime,
         info.LastWriteTime.u.LowPart  = mtime->dwLowDateTime;
     }
 
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
+
     return set_ntstatus( NtSetInformationFile( file, &io, &info, sizeof(info), FileBasicInformation ));
 }
 
@@ -3729,6 +3787,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH SetFileValidData( HANDLE file, LONGLONG length )
 {
     FILE_VALID_DATA_LENGTH_INFORMATION info;
     IO_STATUS_BLOCK io;
+
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
 
     info.ValidDataLength.QuadPart = length;
     return set_ntstatus( NtSetInformationFile( file, &io, &info, sizeof(info),
@@ -3743,6 +3804,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH UnlockFile( HANDLE file, DWORD offset_low, DWORD o
                                           DWORD count_low, DWORD count_high )
 {
     LARGE_INTEGER count, offset;
+
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
 
     count.u.LowPart = count_low;
     count.u.HighPart = count_high;
@@ -3764,6 +3828,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH UnlockFileEx( HANDLE file, DWORD reserved,
         return FALSE;
     }
     if (overlapped->hEvent) FIXME("Unimplemented overlapped operation\n");
+
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
 
     return UnlockFile( file, overlapped->u.s.Offset, overlapped->u.s.OffsetHigh, count_low, count_high );
 }
@@ -3796,6 +3863,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH WriteFile( HANDLE file, LPCVOID buffer, DWORD coun
     }
     else piosb->Information = 0;
     piosb->u.Status = STATUS_PENDING;
+
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
 
     status = NtWriteFile( file, event, NULL, cvalue, piosb, buffer, count, poffset, NULL );
 
@@ -3841,6 +3911,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH WriteFileEx( HANDLE file, LPCVOID buffer,
     io->u.Status = STATUS_PENDING;
     io->Information = 0;
 
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
+
     status = NtWriteFile( file, NULL, read_write_apc, completion, io, buffer, count, &offset, NULL );
     if (status == STATUS_PENDING) return TRUE;
     return set_ntstatus( status );
@@ -3865,6 +3938,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH WriteFileGather( HANDLE file, FILE_SEGMENT_ELEMENT
     io = (PIO_STATUS_BLOCK)overlapped;
     io->u.Status = STATUS_PENDING;
     io->Information = 0;
+
+    if ((DWORD)(DWORD_PTR)file == STD_INPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_OUTPUT_HANDLE || (DWORD)(DWORD_PTR)file == STD_ERROR_HANDLE)
+        file = GetStdHandle((DWORD_PTR)file);
 
     return set_ntstatus( NtWriteFileGather( file, overlapped->hEvent, NULL, cvalue,
                                             io, segments, count, &offset, NULL ));
